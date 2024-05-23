@@ -8,7 +8,7 @@ numero_orden,cliente,producto_id,producto_nombre,cantidad,precio_venta,subtotal,
 7,Juanma (CTO),8,cafe,100,1.0,100.0,-500.0,-500.0,100.0
 8,luciana,8,cafe,10,1000.0,10000.0,0.0,0.0,10000.0
 9,santi,12,leche proteina,100,1500.0,150000.0,0.0,0.0,150000.0
-10,luciana,11,cafe,2,1,2e+18,0.0,0.0,2
+10,luciana,11,cafe,2,1,2,0.0,0.0,2
 11,Test,13,cafe,2,1.0,2.0,0.0,0.0,2.0
 12,Juanma (CTO),14,cafe,1,100.0,100.0,-100.0,0.0,200.0
 13,martin.chara01@gmail.com,14,cafe,1,400.0,400.0,-400.0,0.0,800.0
