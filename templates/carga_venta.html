@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Carga de Venta{% endblock %}
+
+{% block content %}
+    <h1>Carga de Venta</h1>
+    <form method="post" action="{{ url_for('carga_venta') }}" onsubmit="return validateForm()" novalidate>
+        <div class="form-group">
+            <label for="cliente">Nombre del Cliente:</label>
+            <input type="text" class="form-control" id="cliente" name="cliente" required>
+            <div class="invalid-feedback">
+                Por favor, ingrese el nombre del cliente.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="producto">Producto:</label>
+            <select class="form-control" id="producto" name="producto" required>
+                {% for producto in productos %}
+                <option value="{{ producto['id'] }}" data-stock="{{ producto['cantidad'] }}" data-precio="{{ producto['precio'] }}">
+                    {{ producto['nombre'] }} (Stock: {{ producto['cantidad'] }})
+                </option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback">
+                Por favor, seleccione un producto.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="cantidad">Cantidad:</label>
+            <input type="number" class="form-control" id="cantidad" name="cantidad" min="1" required>
+            <div class="invalid-feedback">
+                Por favor, ingrese una cantidad válida.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="precio_venta">Precio de Venta:</label>
+            <input type="number" step="0.01" class="form-control" id="precio_venta" name="precio_venta" min="0" required>
+            <div class="invalid-feedback">
+                Por favor, ingrese un precio de venta válido.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="descuento">Descuento:</label>
+            <input type="number" step="0.01" class="form-control" id="descuento" name="descuento" min="0" value="0" required>
+            <div class="invalid-feedback">
+                Por favor, ingrese un descuento válido.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="cargo_envio">Cargo por Envío:</label>
+            <input type="number" step="0.01" class="form-control" id="cargo_envio" name="cargo_envio" min="0" value="0" required>
+            <div class="invalid-feedback">
+                Por favor, ingrese un cargo por envío válido.
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Cargar Orden</button>
+    </form>
+
+    <h2 class="mt-5">Últimas Transacciones de Ventas</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Número de Orden</th>
+                <th>Cliente</th>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio de Venta</th>
+                <th>Subtotal</th>
+                <th>Descuento</th>
+                <th>Cargo por Envío</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for venta in ventas %}
+            <tr>
+                <td>{{ venta['numero_orden'] }}</td>
+                <td>{{ venta['cliente'] }}</td>
+                <td>{{ venta['producto_nombre'] }}</td>
+                <td>{{ venta['cantidad'] }}</td>
+                <td>${{ "{:,.2f}".format(venta['precio_venta']) }}</td>
+                <td>${{ "{:,.2f}".format(venta['subtotal']) }}</td>
+                <td>${{ "{:,.2f}".format(venta['descuento']) }}</td>
+                <td>${{ "{:,.2f}".format(venta['cargo_envio']) }}</td>
+                <td>${{ "{:,.2f}".format(venta['total']) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        // Ejemplo de validación personalizada
+        (function() {
+            'use strict';
+            window.addEventListener('load', function() {
+                var forms = document.getElementsByClassName('needs-validation');
+                Array.prototype.filter.call(forms, function(form) {
+                    form.addEventListener('submit', function(event) {
+                        if (form.checkValidity() === false) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+                    }, false);
+                });
+            }, false);
+        })();
+
+        function validateForm() {
+            var cantidad = parseFloat(document.getElementById('cantidad').value);
+            var precioVenta = parseFloat(document.getElementById('precio_venta').value);
+            var descuento = parseFloat(document.getElementById('descuento').value);
+            var cargoEnvio = parseFloat(document.getElementById('cargo_envio').value);
+            var producto = document.getElementById('producto');
+            var stock = parseFloat(producto.options[producto.selectedIndex].getAttribute('data-stock'));
+            var subtotal = cantidad * precioVenta;
+
+            if (cantidad > stock) {
+                showCustomError('cantidad', 'La cantidad no puede superar el stock del producto.');
+                return false;
+            }
+            if (precioVenta <= 0) {
+                showCustomError('precio_venta', 'El precio de venta debe ser mayor a cero.');
+                return false;
+            }
+            if (descuento < 0) {
+                showCustomError('descuento', 'El descuento no puede ser negativo.');
+                return false;
+            }
+            if (descuento > subtotal) {
+                showCustomError('descuento', 'El descuento no puede ser mayor que el subtotal.');
+                return false;
+            }
+            if (cargoEnvio < 0) {
+                showCustomError('cargo_envio', 'El cargo por envío no puede ser negativo.');
+                return false;
+            }
+            return true;
+        }
+
+        function showCustomError(elementId, message) {
+            var element = document.getElementById(elementId);
+            element.classList.add('is-invalid');
+            element.nextElementSibling.textContent = message;
+        }
+    </script>
+{% endblock %}
