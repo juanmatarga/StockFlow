@@ -143,21 +143,22 @@ def delete_producto_endpoint(id):
 @app.route('/api/analitica', methods=['GET'])
 def analitica():
     productos = get_productos()
-    df = pd.DataFrame(productos, columns=['ID', 'Nombre', 'Cantidad', 'Precio', 'Unidad de Medida'])
+    
+    df = pd.DataFrame(productos, columns=['id', 'nombre', 'cantidad', 'precio', 'unidad_medida'])
+    
     df.to_csv('inventario.csv', index=False)
-
+    
     df = pd.read_csv('inventario.csv')
+    
     analisis = df.describe().to_json()
-
-    df['Nombre'] = df['Nombre'].astype(str) + ' (' + df['Unidad de Medida'] + ')'
-    df.plot(kind='bar', x='Nombre', y='Cantidad')
+    df['nombre'] = df['nombre'].astype(str) + ' (' + df['unidad_medida'] + ')'
+    print(df[['nombre', 'cantidad']])
+    df.plot(kind='bar', x='nombre', y='cantidad')
     plt.savefig('inventario.png')
     plt.close()
-
+    
     return jsonify(analisis)
 
-
-# Ruta para cargar ventas
 @app.route('/api/productos/carga_venta', methods=['GET', 'POST'])
 def carga_venta():
     if request.method == 'POST':
