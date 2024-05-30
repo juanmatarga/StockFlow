@@ -31,5 +31,8 @@
             {% endfor %}
         </tbody>
     </table>
-    <a href="{{ url_for('add_product') }}" class="btn btn-primary mt-3">Añadir Producto</a>
+    <div class="mt-3">
+        <a href="{{ url_for('add_product') }}" class="btn btn-primary">Añadir Producto</a>
+        <a href="{{ url_for('carga_compras') }}" class="btn btn-secondary">Carga de Compras</a>
+    </div>
 {% endblock %}

@@ -1,7 +1,5 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, g
 import sqlite3
-import pandas as pd
-import matplotlib.pyplot as plt
 import os
 import csv
 
@@ -108,6 +106,35 @@ def get_producto(id):
         return dict(row)
     return None
 
+# Función para obtener el historial de compras
+
+def get_compras():
+    db = get_db()
+    c = db.cursor()
+    c.execute("SELECT * FROM compras")
+    rows = c.fetchall()
+    compras = [dict(row) for row in rows]
+    return compras
+
+# Crear tabla de compras
+def create_compras_table():
+    db = get_db()
+    c = db.cursor()
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS compras (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto_id INTEGER,
+        producto_nombre TEXT,
+        cantidad INTEGER,
+        precio REAL,
+        total REAL
+    )
+    ''')
+    db.commit()
+
+
+with app.app_context():
+    create_compras_table()
 
 # Rutas para la API
 @app.route('/api/productos', methods=['GET'])
@@ -137,27 +164,13 @@ def update_producto_endpoint(id):
 @app.route('/api/productos/<int:id>', methods=['DELETE'])
 def delete_producto_endpoint(id):
     delete_producto(id)
-    return jsonify({'message': 'Producto eliminado'})
-
+    return jsonify({'message': 'Producto eliminado'}), 200
 
 @app.route('/api/analitica', methods=['GET'])
 def analitica():
     productos = get_productos()
-    df = pd.DataFrame(productos, columns=['ID', 'Nombre', 'Cantidad', 'Precio', 'Unidad de Medida'])
-    df.to_csv('inventario.csv', index=False)
+    return jsonify(productos)
 
-    df = pd.read_csv('inventario.csv')
-    analisis = df.describe().to_json()
-
-    df['Nombre'] = df['Nombre'].astype(str) + ' (' + df['Unidad de Medida'] + ')'
-    df.plot(kind='bar', x='Nombre', y='Cantidad')
-    plt.savefig('inventario.png')
-    plt.close()
-
-    return jsonify(analisis)
-
-
-# Ruta para cargar ventas
 @app.route('/api/productos/carga_venta', methods=['GET', 'POST'])
 def carga_venta():
     if request.method == 'POST':
@@ -233,38 +246,72 @@ def carga_venta():
 
     return render_template('carga_venta.html', productos=productos, ventas=ventas)
 
+
+@app.route('/api/compras', methods=['POST'])
+def add_compra():
+    data = request.json
+    producto_id = data['producto_id']
+    cantidad = data['cantidad']
+    precio = data['precio']
+
+    producto = get_producto(producto_id)
+    if producto:
+        nuevo_precio = ((producto['cantidad'] * producto['precio']) + (cantidad * precio)) / (producto['cantidad'] + cantidad)
+        nuevo_stock = producto['cantidad'] + cantidad
+
+        update_producto(producto_id, producto['nombre'], nuevo_stock, nuevo_precio, producto['unidad_medida'])
+
+        return jsonify({'message': 'Compra cargada exitosamente'}), 201
+    return jsonify({'error': 'Producto no encontrado'}), 404
+
+
+@app.route('/carga_compras', methods=['GET', 'POST'])
+def carga_compras():
+    if request.method == 'POST':
+        producto_id = int(request.form['producto'])
+        cantidad = int(request.form['cantidad'])
+        precio = float(request.form['precio'])
+
+        producto = get_producto(producto_id)
+        if producto:
+            nuevo_precio = ((producto['cantidad'] * producto['precio']) + (cantidad * precio)) / (producto['cantidad'] + cantidad)
+            nuevo_stock = producto['cantidad'] + cantidad
+
+            update_producto(producto_id, producto['nombre'], nuevo_stock, nuevo_precio, producto['unidad_medida'])
+
+            total = cantidad * precio
+
+            db = get_db()
+            c = db.cursor()
+            c.execute('''
+                INSERT INTO compras (producto_id, producto_nombre, cantidad, precio, total)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (producto_id, producto['nombre'], cantidad, precio, total))
+
+            db.commit()
+
+            flash('Compra cargada exitosamente', 'success')
+            return redirect(url_for('carga_compras'))
+
+    productos = get_productos()
+    compras = get_compras()
+    return render_template('carga_compras.html', productos=productos, compras=compras)
+
+
+
 # Rutas para la interfaz web
 @app.route('/')
 def index():
     productos = get_productos()
     return render_template('index.html', productos=productos)
 
-@app.route('/api/ventas', methods=['GET'])
-def get_ventas_endpoint():
-    ventas = []
-    ventas_csv_path = 'ventas.csv'
-    if os.path.isfile(ventas_csv_path):
-        with open(ventas_csv_path, newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                row['numero_orden'] = int(row['numero_orden'])
-                row['cantidad'] = int(row['cantidad'])
-                row['precio_venta'] = float(row['precio_venta'])
-                row['subtotal'] = float(row['subtotal'])
-                row['descuento'] = float(row['descuento'])
-                row['cargo_envio'] = float(row['cargo_envio'])
-                row['total'] = float(row['total'])
-                ventas.append(row)
-    return jsonify(ventas)
 
 @app.route('/add_product', methods=['GET', 'POST'])
 def add_product():
     if request.method == 'POST':
         nombre = request.form['nombre']
-        cantidad = request.form['cantidad']
-        precio = request.form['precio']
         unidad_medida = request.form['unidad_medida']
-        add_producto(nombre, cantidad, precio, unidad_medida)
+        add_producto(nombre, 0, 0, unidad_medida)
         flash('Producto añadido exitosamente', 'success')
         return redirect(url_for('index'))
     return render_template('add_product.html')
