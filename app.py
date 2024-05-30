@@ -146,11 +146,10 @@ def analitica():
     df = pd.DataFrame(productos, columns=['ID', 'Nombre', 'Cantidad', 'Precio', 'Unidad de Medida'])
     df.to_csv('inventario.csv', index=False)
 
-    # Análisis con Pandas
     df = pd.read_csv('inventario.csv')
     analisis = df.describe().to_json()
 
-    # Visualización
+    df['Nombre'] = df['Nombre'].astype(str) + ' (' + df['Unidad de Medida'] + ')'
     df.plot(kind='bar', x='Nombre', y='Cantidad')
     plt.savefig('inventario.png')
     plt.close()
