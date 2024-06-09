@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, f
 import sqlite3
 import os
 import csv
+import pandas as pd
+import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Necesario para utilizar flash messages
@@ -169,7 +171,21 @@ def delete_producto_endpoint(id):
 @app.route('/api/analitica', methods=['GET'])
 def analitica():
     productos = get_productos()
-    return jsonify(productos)
+
+    df = pd.DataFrame(productos, columns=['id', 'nombre', 'cantidad', 'precio', 'unidad_medida'])
+
+    df.to_csv('inventario.csv', index=False)
+    
+    df = pd.read_csv('inventario.csv')
+
+    analisis = df.describe().to_json()
+    df['nombre'] = df['nombre'].astype(str) + ' (' + df['unidad_medida'] + ')'
+    print(df[['nombre', 'cantidad']])
+    df.plot(kind='bar', x='nombre', y='cantidad')
+    plt.savefig('inventario.png')
+    plt.close()
+    
+    return jsonify(analisis)
 
 @app.route('/api/productos/carga_venta', methods=['GET', 'POST'])
 def carga_venta():

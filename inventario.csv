@@ -1,2 +1,2 @@
-ID,Nombre,Cantidad,Precio,Unidad de Medida
-,,,,
+id,nombre,cantidad,precio,unidad_medida
+23,zanahoria,40,1000.0,kg
