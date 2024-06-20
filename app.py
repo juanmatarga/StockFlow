@@ -1,12 +1,10 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, g
 import sqlite3
-import os
-import csv
 import pandas as pd
 import matplotlib.pyplot as plt
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'
+app.secret_key = 'supersecretkey'  # Necesario para utilizar flash messages
 
 
 # Función para obtener la conexión a la base de datos
@@ -143,7 +141,25 @@ def get_producto(id):
     return None
 
 
-# Función para obtener el historial de compras
+def add_venta(numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total):
+    db = get_db()
+    c = db.cursor()
+    c.execute('''
+    INSERT INTO ventas (numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total))
+    db.commit()
+
+
+def get_ventas():
+    db = get_db()
+    c = db.cursor()
+    c.execute("SELECT * FROM ventas")
+    rows = c.fetchall()
+    ventas = [dict(row) for row in rows]
+    return ventas
+
+
 def get_compras():
     db = get_db()
     c = db.cursor()
@@ -225,57 +241,17 @@ def carga_venta():
             max_orden = c.fetchone()[0]
             numero_orden = (max_orden if max_orden else 0) + 1
 
-            c.execute('''
-                INSERT INTO ventas (numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (numero_orden, cliente, producto_id, producto['nombre'], cantidad, precio_venta, subtotal, descuento,
-                  cargo_envio, total))
+            add_venta(numero_orden, cliente, producto_id, producto['nombre'], cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
 
             c.execute("UPDATE productos SET cantidad = cantidad - ? WHERE id = ?", (cantidad, producto_id))
 
             db.commit()
 
-            # Guardar la venta en un archivo CSV
-            venta = {
-                'numero_orden': numero_orden,
-                'cliente': cliente,
-                'producto_id': producto_id,
-                'producto_nombre': producto['nombre'],
-                'cantidad': cantidad,
-                'precio_venta': precio_venta,
-                'subtotal': subtotal,
-                'descuento': descuento,
-                'cargo_envio': cargo_envio,
-                'total': total
-            }
-            ventas_csv_path = 'ventas.csv'
-            file_exists = os.path.isfile(ventas_csv_path)
-            with open(ventas_csv_path, 'a', newline='') as csvfile:
-                fieldnames = ['numero_orden', 'cliente', 'producto_id', 'producto_nombre', 'cantidad', 'precio_venta',
-                              'subtotal', 'descuento', 'cargo_envio', 'total']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                if not file_exists:
-                    writer.writeheader()
-                writer.writerow(venta)
-
             flash('Orden de venta cargada exitosamente', 'success')
             return redirect(url_for('carga_venta'))
 
     productos = get_productos()
-    ventas = []
-    ventas_csv_path = 'ventas.csv'
-    if os.path.isfile(ventas_csv_path):
-        with open(ventas_csv_path, newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                row['numero_orden'] = int(row['numero_orden'])
-                row['cantidad'] = int(row['cantidad'])
-                row['precio_venta'] = float(row['precio_venta'])
-                row['subtotal'] = float(row['subtotal'])
-                row['descuento'] = float(row['descuento'])
-                row['cargo_envio'] = float(row['cargo_envio'])
-                row['total'] = float(row['total'])
-                ventas.append(row)
+    ventas = get_ventas()
 
     return render_template('carga_venta.html', productos=productos, ventas=ventas)
 
