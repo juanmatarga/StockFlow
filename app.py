@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # Necesario para utilizar flash messages
+app.secret_key = 'supersecretkey'
 
 
 # Función para obtener la conexión a la base de datos
@@ -22,6 +22,22 @@ def close_db(exception):
     db = g.pop('db', None)
     if db is not None:
         db.close()
+
+
+# Crear tabla de productos si no existe
+def create_productos_table():
+    db = get_db()
+    c = db.cursor()
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS productos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        cantidad INTEGER,
+        precio REAL,
+        unidad_medida TEXT DEFAULT 'unidades'
+    )
+    ''')
+    db.commit()
 
 
 # Crear tabla de ventas
@@ -61,10 +77,28 @@ def add_unidad_medida_column():
         db.commit()
 
 
+# Crear tabla de compras
+def create_compras_table():
+    db = get_db()
+    c = db.cursor()
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS compras (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto_id INTEGER,
+        producto_nombre TEXT,
+        cantidad INTEGER,
+        precio REAL,
+        total REAL
+    )
+    ''')
+    db.commit()
+
+
 with app.app_context():
+    create_productos_table()  # Crear la tabla productos primero
     add_unidad_medida_column()
     create_sales_table()
-
+    create_compras_table()
 
 # Operaciones CRUD
 def add_producto(nombre, cantidad, precio, unidad_medida):
@@ -108,8 +142,8 @@ def get_producto(id):
         return dict(row)
     return None
 
-# Función para obtener el historial de compras
 
+# Función para obtener el historial de compras
 def get_compras():
     db = get_db()
     c = db.cursor()
@@ -118,25 +152,6 @@ def get_compras():
     compras = [dict(row) for row in rows]
     return compras
 
-# Crear tabla de compras
-def create_compras_table():
-    db = get_db()
-    c = db.cursor()
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS compras (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        producto_id INTEGER,
-        producto_nombre TEXT,
-        cantidad INTEGER,
-        precio REAL,
-        total REAL
-    )
-    ''')
-    db.commit()
-
-
-with app.app_context():
-    create_compras_table()
 
 # Rutas para la API
 @app.route('/api/productos', methods=['GET'])
@@ -168,6 +183,7 @@ def delete_producto_endpoint(id):
     delete_producto(id)
     return jsonify({'message': 'Producto eliminado'}), 200
 
+
 @app.route('/api/analitica', methods=['GET'])
 def analitica():
     productos = get_productos()
@@ -186,6 +202,7 @@ def analitica():
     plt.close()
     
     return jsonify(analisis)
+
 
 @app.route('/api/productos/carga_venta', methods=['GET', 'POST'])
 def carga_venta():
@@ -312,7 +329,6 @@ def carga_compras():
     productos = get_productos()
     compras = get_compras()
     return render_template('carga_compras.html', productos=productos, compras=compras)
-
 
 
 # Rutas para la interfaz web

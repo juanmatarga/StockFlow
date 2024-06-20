@@ -14,3 +14,4 @@ numero_orden,cliente,producto_id,producto_nombre,cantidad,precio_venta,subtotal,
 13,martin.chara01@gmail.com,14,cafe,1,400.0,400.0,-400.0,0.0,800.0
 14,Juanma (CTO),15,yerba,100,100.0,10000.0,0.0,0.0,10000.0
 15,CTO,16,Mate cocido,10,5.0,50.0,0.0,0.0,50.0
+1,Juanma,1,Café,100,200.0,20000.0,0.0,0.0,20000.0
