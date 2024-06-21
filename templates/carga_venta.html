@@ -6,6 +6,10 @@
 <h1>Carga de Venta</h1>
 <form method="post" action="{{ url_for('carga_venta') }}" onsubmit="return validateForm()" novalidate>
     <div class="form-group">
+        <label for="fecha">Fecha:</label>
+        <input type="date" class="form-control" id="fecha" name="fecha" required>
+    </div>
+    <div class="form-group">
         <label for="cliente">Nombre del Cliente:</label>
         <input type="text" class="form-control" id="cliente" name="cliente" required>
         <div class="invalid-feedback">
@@ -52,10 +56,6 @@
         <div class="invalid-feedback">
             Por favor, ingrese un cargo por envío válido.
         </div>
-    </div>
-    <div class="form-group">
-        <label for="fecha">Fecha de Venta:</label>
-        <input type="date" class="form-control" id="fecha" name="fecha" required>
     </div>
     <button type="submit" class="btn btn-primary">Cargar Orden</button>
 </form>
