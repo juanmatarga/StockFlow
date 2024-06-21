@@ -95,6 +95,12 @@
 </table>
 
     <script>
+        document.addEventListener("DOMContentLoaded", function() {
+        var fechaInput = document.getElementById("fecha");
+        var today = new Date().toISOString().split('T')[0];
+        fechaInput.value = today;
+         });
+
         (function() {
             'use strict';
             window.addEventListener('load', function() {
