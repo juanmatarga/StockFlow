@@ -45,7 +45,7 @@ def create_sales_table():
     c.execute('''
     CREATE TABLE IF NOT EXISTS ventas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        numero_orden INTEGER,
+        fecha TEXT,
         cliente TEXT,
         producto_id INTEGER,
         producto_nombre TEXT,
@@ -54,26 +54,11 @@ def create_sales_table():
         subtotal REAL,
         descuento REAL,
         cargo_envio REAL,
-        total REAL
+        total REAL,
+        FOREIGN KEY (producto_id) REFERENCES productos (id)
     )
     ''')
     db.commit()
-
-
-# Crear tabla de productos si no existe y agregar columna unidad_medida si es necesario
-def add_unidad_medida_column():
-    db = get_db()
-    c = db.cursor()
-
-    # Verificar si la columna unidad_medida ya existe
-    c.execute("PRAGMA table_info(productos)")
-    columns = [col[1] for col in c.fetchall()]
-
-    if 'unidad_medida' not in columns:
-        # Si no existe, agregar la columna
-        c.execute("ALTER TABLE productos ADD COLUMN unidad_medida TEXT DEFAULT 'unidades'")
-        db.commit()
-
 
 # Crear tabla de compras
 def create_compras_table():
@@ -82,11 +67,13 @@ def create_compras_table():
     c.execute('''
     CREATE TABLE IF NOT EXISTS compras (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT,
         producto_id INTEGER,
         producto_nombre TEXT,
         cantidad INTEGER,
         precio REAL,
-        total REAL
+        total REAL,
+        FOREIGN KEY (producto_id) REFERENCES productos (id)
     )
     ''')
     db.commit()
@@ -94,7 +81,6 @@ def create_compras_table():
 
 with app.app_context():
     create_productos_table()  # Crear la tabla productos primero
-    add_unidad_medida_column()
     create_sales_table()
     create_compras_table()
 
@@ -141,13 +127,13 @@ def get_producto(id):
     return None
 
 
-def add_venta(numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total):
+def add_venta(cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total):
     db = get_db()
     c = db.cursor()
     c.execute('''
-    INSERT INTO ventas (numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (numero_orden, cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total))
+    INSERT INTO ventas (cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total))
     db.commit()
 
 
@@ -220,41 +206,53 @@ def analitica():
     return jsonify(analisis)
 
 
-@app.route('/api/productos/carga_venta', methods=['GET', 'POST'])
+@app.route('/carga_venta', methods=['GET', 'POST'])
 def carga_venta():
     if request.method == 'POST':
         cliente = request.form['cliente']
-        producto_id = int(request.form['producto'])
-        cantidad = int(request.form['cantidad'])
+        producto_id = request.form['producto']
+        cantidad = float(request.form['cantidad'])
         precio_venta = float(request.form['precio_venta'])
         descuento = float(request.form['descuento'])
         cargo_envio = float(request.form['cargo_envio'])
+        fecha = request.form['fecha']
 
-        producto = get_producto(producto_id)
-        if producto and cantidad <= producto['cantidad']:
-            subtotal = cantidad * precio_venta
-            total = subtotal - descuento + cargo_envio
+        subtotal = precio_venta * cantidad
+        total = subtotal - descuento + cargo_envio
 
-            db = get_db()
-            c = db.cursor()
-            c.execute("SELECT MAX(numero_orden) FROM ventas")
-            max_orden = c.fetchone()[0]
-            numero_orden = (max_orden if max_orden else 0) + 1
+        db = get_db()
+        c = db.cursor()
 
-            add_venta(numero_orden, cliente, producto_id, producto['nombre'], cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
+        # Parche a acomodar, insertar producto_nombre en la tabla ventas y descontar stock
+        c.execute('SELECT * FROM productos WHERE id = ?', (producto_id,))
+        producto = c.fetchone()
+        producto_nombre = producto['nombre']
+        if producto:
+            nuevo_stock = producto['cantidad'] - cantidad
+            c.execute('UPDATE productos SET cantidad = ? WHERE id = ?', (nuevo_stock, producto_id))
+        
+        # Insertar la nueva venta
+        c.execute('''
+            INSERT INTO ventas (cliente, producto_id, producto_nombre, cantidad, precio_venta, descuento, cargo_envio, total, fecha, subtotal)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (cliente, producto_id, producto_nombre, cantidad, precio_venta, descuento, cargo_envio, total, fecha, subtotal))
 
-            c.execute("UPDATE productos SET cantidad = cantidad - ? WHERE id = ?", (cantidad, producto_id))
+        db.commit()
+        return redirect(url_for('carga_venta'))
 
-            db.commit()
+    db = get_db()
+    c = db.cursor()
+    c.execute('SELECT id, nombre, cantidad, precio FROM productos')
+    productos = c.fetchall() 
 
-            flash('Orden de venta cargada exitosamente', 'success')
-            return redirect(url_for('carga_venta'))
-
-    productos = get_productos()
-    ventas = get_ventas()
+    c.execute('''
+        SELECT v.*, p.nombre as producto_nombre 
+        FROM ventas v 
+        JOIN productos p ON v.producto_id = p.id
+    ''')
+    ventas = c.fetchall()  # Asegurándonos de que ventas sea una lista
 
     return render_template('carga_venta.html', productos=productos, ventas=ventas)
-
 
 @app.route('/api/compras', methods=['POST'])
 def add_compra():
@@ -277,34 +275,53 @@ def add_compra():
 @app.route('/carga_compras', methods=['GET', 'POST'])
 def carga_compras():
     if request.method == 'POST':
-        producto_id = int(request.form['producto'])
-        cantidad = int(request.form['cantidad'])
+        producto_id = request.form['producto']
+        cantidad = float(request.form['cantidad'])
         precio = float(request.form['precio'])
+        fecha = request.form['fecha']
 
-        producto = get_producto(producto_id)
+        db = get_db()
+        c = db.cursor()
+
+        # Obtener el producto actual
+        c.execute('SELECT * FROM productos WHERE id = ?', (producto_id,))
+        producto = c.fetchone()
+
         if producto:
+            # Calcular el nuevo precio ponderado
             nuevo_precio = ((producto['cantidad'] * producto['precio']) + (cantidad * precio)) / (producto['cantidad'] + cantidad)
             nuevo_stock = producto['cantidad'] + cantidad
 
-            update_producto(producto_id, producto['nombre'], nuevo_stock, nuevo_precio, producto['unidad_medida'])
-
-            total = cantidad * precio
-
-            db = get_db()
-            c = db.cursor()
+            # Actualizar el producto con el nuevo stock y precio
             c.execute('''
-                INSERT INTO compras (producto_id, producto_nombre, cantidad, precio, total)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (producto_id, producto['nombre'], cantidad, precio, total))
+                UPDATE productos
+                SET cantidad = ?, precio = ?
+                WHERE id = ?
+            ''', (nuevo_stock, nuevo_precio, producto_id))
+
+            # Insertar la nueva compra
+            c.execute('''
+                INSERT INTO compras (producto_id, producto_nombre, cantidad, precio, total, fecha)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (producto_id, producto['nombre'], cantidad, precio, cantidad * precio, fecha))
 
             db.commit()
-
-            flash('Compra cargada exitosamente', 'success')
             return redirect(url_for('carga_compras'))
 
-    productos = get_productos()
-    compras = get_compras()
+    db = get_db()
+    c = db.cursor()
+    c.execute('SELECT * FROM productos')
+    productos = c.fetchall()
+
+    c.execute('''
+        SELECT c.*, p.nombre as producto_nombre 
+        FROM compras c 
+        JOIN productos p ON c.producto_id = p.id
+    ''')
+    compras = c.fetchall()
+
     return render_template('carga_compras.html', productos=productos, compras=compras)
+
 
 
 # Rutas para la interfaz web

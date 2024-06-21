@@ -3,93 +3,98 @@
 {% block title %}Carga de Venta{% endblock %}
 
 {% block content %}
-    <h1>Carga de Venta</h1>
-    <form method="post" action="{{ url_for('carga_venta') }}" onsubmit="return validateForm()" novalidate>
-        <div class="form-group">
-            <label for="cliente">Nombre del Cliente:</label>
-            <input type="text" class="form-control" id="cliente" name="cliente" required>
-            <div class="invalid-feedback">
-                Por favor, ingrese el nombre del cliente.
-            </div>
+<h1>Carga de Venta</h1>
+<form method="post" action="{{ url_for('carga_venta') }}" onsubmit="return validateForm()" novalidate>
+    <div class="form-group">
+        <label for="cliente">Nombre del Cliente:</label>
+        <input type="text" class="form-control" id="cliente" name="cliente" required>
+        <div class="invalid-feedback">
+            Por favor, ingrese el nombre del cliente.
         </div>
-        <div class="form-group">
-            <label for="producto">Producto:</label>
-            <select class="form-control" id="producto" name="producto" required>
-                {% for producto in productos %}
-                <option value="{{ producto['id'] }}" data-stock="{{ producto['cantidad'] }}" data-precio="{{ producto['precio'] }}">
-                    {{ producto['nombre'] }} (Stock: {{ producto['cantidad'] }})
-                </option>
-                {% endfor %}
-            </select>
-            <div class="invalid-feedback">
-                Por favor, seleccione un producto.
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="cantidad">Cantidad:</label>
-            <input type="number" class="form-control" id="cantidad" name="cantidad" min="1" required>
-            <div class="invalid-feedback">
-                Por favor, ingrese una cantidad válida.
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="precio_venta">Precio de Venta:</label>
-            <input type="number" step="0.01" class="form-control" id="precio_venta" name="precio_venta" min="0" required>
-            <div class="invalid-feedback">
-                Por favor, ingrese un precio de venta válido.
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="descuento">Descuento:</label>
-            <input type="number" step="0.01" class="form-control" id="descuento" name="descuento" min="0" value="0" required>
-            <div class="invalid-feedback">
-                Por favor, ingrese un descuento válido.
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="cargo_envio">Cargo por Envío:</label>
-            <input type="number" step="0.01" class="form-control" id="cargo_envio" name="cargo_envio" min="0" value="0" required>
-            <div class="invalid-feedback">
-                Por favor, ingrese un cargo por envío válido.
-            </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Cargar Orden</button>
-    </form>
-
-    <h2 class="mt-5">Últimas Transacciones de Ventas</h2>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Número de Orden</th>
-                <th>Cliente</th>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio de Venta</th>
-                <th>Subtotal</th>
-                <th>Descuento</th>
-                <th>Cargo por Envío</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for venta in ventas %}
-            <tr>
-                <td>{{ venta['numero_orden'] }}</td>
-                <td>{{ venta['cliente'] }}</td>
-                <td>{{ venta['producto_nombre'] }}</td>
-                <td>{{ venta['cantidad'] }}</td>
-                <td>${{ "{:,.2f}".format(venta['precio_venta']) }}</td>
-                <td>${{ "{:,.2f}".format(venta['subtotal']) }}</td>
-                <td>${{ "{:,.2f}".format(venta['descuento']) }}</td>
-                <td>${{ "{:,.2f}".format(venta['cargo_envio']) }}</td>
-                <td>${{ "{:,.2f}".format(venta['total']) }}</td>
-            </tr>
+    </div>
+    <div class="form-group">
+        <label for="producto">Producto:</label>
+        <select class="form-control" id="producto" name="producto" required>
+            {% for producto in productos %}
+            <option value="{{ producto['id'] }}" data-stock="{{ producto['cantidad'] }}" data-precio="{{ producto['precio'] }}">
+                {{ producto['nombre'] }} (Stock: {{ producto['cantidad'] }})
+            </option>
             {% endfor %}
-        </tbody>
-    </table>
+        </select>
+        <div class="invalid-feedback">
+            Por favor, seleccione un producto.
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="cantidad">Cantidad:</label>
+        <input type="number" class="form-control" id="cantidad" name="cantidad" min="1" required>
+        <div class="invalid-feedback">
+            Por favor, ingrese una cantidad válida.
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="precio_venta">Precio de Venta:</label>
+        <input type="number" step="0.01" class="form-control" id="precio_venta" name="precio_venta" min="0" required>
+        <div class="invalid-feedback">
+            Por favor, ingrese un precio de venta válido.
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="descuento">Descuento:</label>
+        <input type="number" step="0.01" class="form-control" id="descuento" name="descuento" min="0" value="0" required>
+        <div class="invalid-feedback">
+            Por favor, ingrese un descuento válido.
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="cargo_envio">Cargo por Envío:</label>
+        <input type="number" step="0.01" class="form-control" id="cargo_envio" name="cargo_envio" min="0" value="0" required>
+        <div class="invalid-feedback">
+            Por favor, ingrese un cargo por envío válido.
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="fecha">Fecha de Venta:</label>
+        <input type="date" class="form-control" id="fecha" name="fecha" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Cargar Orden</button>
+</form>
+
+<h2 class="mt-5">Últimas Transacciones de Ventas</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Número de Orden</th>
+            <th>Cliente</th>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Precio de Venta</th>
+            <th>Subtotal</th>
+            <th>Descuento</th>
+            <th>Cargo por Envío</th>
+            <th>Total</th>
+            <th>Fecha</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for venta in ventas %}
+        <tr>
+            <td>{{ venta['id'] }}</td>
+            <td>{{ venta['cliente'] }}</td>
+            <td>{{ venta['producto_nombre'] }}</td>
+            <td>{{ venta['cantidad'] }}</td>
+            <td>${{ "%.2f"|format(venta['precio_venta']) }}</td>
+            <td>${{ "%.2f"|format(venta['subtotal']) }}</td>
+            <td>${{ "%.2f"|format(venta['descuento']) }}</td>
+            <td>${{ "%.2f"|format(venta['cargo_envio']) }}</td>
+            <td>${{ "%.2f"|format(venta['total']) }}</td>
+            <td>{{ venta['fecha'] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
     <script>
-        // Ejemplo de validación personalizada
         (function() {
             'use strict';
             window.addEventListener('load', function() {
@@ -127,10 +132,6 @@
                 showCustomError('descuento', 'El descuento no puede ser negativo.');
                 return false;
             }
-            if (descuento > subtotal) {
-                showCustomError('descuento', 'El descuento no puede ser mayor que el subtotal.');
-                return false;
-            }
             if (cargoEnvio < 0) {
                 showCustomError('cargo_envio', 'El cargo por envío no puede ser negativo.');
                 return false;
@@ -138,10 +139,13 @@
             return true;
         }
 
-        function showCustomError(elementId, message) {
-            var element = document.getElementById(elementId);
-            element.classList.add('is-invalid');
-            element.nextElementSibling.textContent = message;
+        function showCustomError(fieldId, errorMessage) {
+            var field = document.getElementById(fieldId);
+            field.setCustomValidity(errorMessage);
+            field.reportValidity();
+            field.oninput = function() {
+                field.setCustomValidity('');
+            };
         }
     </script>
 {% endblock %}
