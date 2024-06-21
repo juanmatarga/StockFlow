@@ -22,7 +22,7 @@ def close_db(exception):
         db.close()
 
 
-# Crear tabla de productos si no existe
+# PRODUCTOS
 def create_productos_table():
     db = get_db()
     c = db.cursor()
@@ -38,7 +38,7 @@ def create_productos_table():
     db.commit()
 
 
-# Crear tabla de ventas
+# VENTAS
 def create_sales_table():
     db = get_db()
     c = db.cursor()
@@ -60,7 +60,7 @@ def create_sales_table():
     ''')
     db.commit()
 
-# Crear tabla de compras
+# COMPRAS
 def create_compras_table():
     db = get_db()
     c = db.cursor()
@@ -80,7 +80,7 @@ def create_compras_table():
 
 
 with app.app_context():
-    create_productos_table()  # Crear la tabla productos primero
+    create_productos_table() 
     create_sales_table()
     create_compras_table()
 
@@ -185,6 +185,22 @@ def delete_producto_endpoint(id):
     delete_producto(id)
     return jsonify({'message': 'Producto eliminado'}), 200
 
+@app.route('/api/compras', methods=['POST'])
+def add_compra():
+    data = request.json
+    producto_id = data['producto_id']
+    cantidad = data['cantidad']
+    precio = data['precio']
+
+    producto = get_producto(producto_id)
+    if producto:
+        nuevo_precio = ((producto['cantidad'] * producto['precio']) + (cantidad * precio)) / (producto['cantidad'] + cantidad)
+        nuevo_stock = producto['cantidad'] + cantidad
+
+        update_producto(producto_id, producto['nombre'], nuevo_stock, nuevo_precio, producto['unidad_medida'])
+
+        return jsonify({'message': 'Compra cargada exitosamente'}), 201
+    return jsonify({'error': 'Producto no encontrado'}), 404
 
 @app.route('/api/analitica', methods=['GET'])
 def analitica():
@@ -205,7 +221,7 @@ def analitica():
     
     return jsonify(analisis)
 
-
+# Rutas para la página web
 @app.route('/carga_venta', methods=['GET', 'POST'])
 def carga_venta():
     if request.method == 'POST':
@@ -250,26 +266,9 @@ def carga_venta():
         FROM ventas v 
         JOIN productos p ON v.producto_id = p.id
     ''')
-    ventas = c.fetchall()  # Asegurándonos de que ventas sea una lista
+    ventas = c.fetchall()
 
     return render_template('carga_venta.html', productos=productos, ventas=ventas)
-
-@app.route('/api/compras', methods=['POST'])
-def add_compra():
-    data = request.json
-    producto_id = data['producto_id']
-    cantidad = data['cantidad']
-    precio = data['precio']
-
-    producto = get_producto(producto_id)
-    if producto:
-        nuevo_precio = ((producto['cantidad'] * producto['precio']) + (cantidad * precio)) / (producto['cantidad'] + cantidad)
-        nuevo_stock = producto['cantidad'] + cantidad
-
-        update_producto(producto_id, producto['nombre'], nuevo_stock, nuevo_precio, producto['unidad_medida'])
-
-        return jsonify({'message': 'Compra cargada exitosamente'}), 201
-    return jsonify({'error': 'Producto no encontrado'}), 404
 
 
 @app.route('/carga_compras', methods=['GET', 'POST'])
@@ -283,23 +282,19 @@ def carga_compras():
         db = get_db()
         c = db.cursor()
 
-        # Obtener el producto actual
         c.execute('SELECT * FROM productos WHERE id = ?', (producto_id,))
         producto = c.fetchone()
 
         if producto:
-            # Calcular el nuevo precio ponderado
             nuevo_precio = ((producto['cantidad'] * producto['precio']) + (cantidad * precio)) / (producto['cantidad'] + cantidad)
             nuevo_stock = producto['cantidad'] + cantidad
 
-            # Actualizar el producto con el nuevo stock y precio
             c.execute('''
                 UPDATE productos
                 SET cantidad = ?, precio = ?
                 WHERE id = ?
             ''', (nuevo_stock, nuevo_precio, producto_id))
 
-            # Insertar la nueva compra
             c.execute('''
                 INSERT INTO compras (producto_id, producto_nombre, cantidad, precio, total, fecha)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -322,9 +317,6 @@ def carga_compras():
 
     return render_template('carga_compras.html', productos=productos, compras=compras)
 
-
-
-# Rutas para la interfaz web
 @app.route('/')
 def index():
     productos = get_productos()

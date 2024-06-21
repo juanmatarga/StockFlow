@@ -64,7 +64,8 @@
 <table class="table table-striped">
     <thead>
         <tr>
-            <th>Número de Orden</th>
+            <th>Nº de Orden</th>
+            <th>Fecha</th>
             <th>Cliente</th>
             <th>Producto</th>
             <th>Cantidad</th>
@@ -73,13 +74,13 @@
             <th>Descuento</th>
             <th>Cargo por Envío</th>
             <th>Total</th>
-            <th>Fecha</th>
         </tr>
     </thead>
     <tbody>
         {% for venta in ventas %}
         <tr>
             <td>{{ venta['id'] }}</td>
+            <td>{{ venta['fecha'] }}</td>
             <td>{{ venta['cliente'] }}</td>
             <td>{{ venta['producto_nombre'] }}</td>
             <td>{{ venta['cantidad'] }}</td>
@@ -88,7 +89,6 @@
             <td>${{ "%.2f"|format(venta['descuento']) }}</td>
             <td>${{ "%.2f"|format(venta['cargo_envio']) }}</td>
             <td>${{ "%.2f"|format(venta['total']) }}</td>
-            <td>{{ venta['fecha'] }}</td>
         </tr>
         {% endfor %}
     </tbody>
