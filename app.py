@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, f
 import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Necesario para utilizar flash messages
@@ -43,7 +44,7 @@ def create_sales_table():
     db = get_db()
     c = db.cursor()
     c.execute('''
-    CREATE TABLE IF NOT EXISTS ventas (
+        CREATE TABLE IF NOT EXISTS ventas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fecha TEXT,
         cliente TEXT,
@@ -202,24 +203,83 @@ def add_compra():
         return jsonify({'message': 'Compra cargada exitosamente'}), 201
     return jsonify({'error': 'Producto no encontrado'}), 404
 
-@app.route('/api/analitica', methods=['GET'])
-def analitica():
-    productos = get_productos()
+@app.route('/api/analitica/<int:producto_id>', methods=['GET'])
+def analitica(producto_id):
+    # Conectar a la base de datos
+    db = get_db()
 
-    df = pd.DataFrame(productos, columns=['id', 'nombre', 'cantidad', 'precio', 'unidad_medida'])
+    # Leer datos de ventas y compras desde la base de datos
+    ventas_df = pd.read_sql_query(
+        "SELECT fecha, cantidad FROM ventas WHERE producto_id = ? AND strftime('%Y-%m', fecha) = '2024-06'",
+        db,
+        params=[producto_id]
+    )
 
-    df.to_csv('inventario.csv', index=False)
-    
-    df = pd.read_csv('inventario.csv')
+    compras_df = pd.read_sql_query(
+        "SELECT fecha, cantidad FROM compras WHERE strftime('%Y-%m', fecha) = '2024-06'",
+        db
+    )
 
-    analisis = df.describe().to_json()
-    df['nombre'] = df['nombre'].astype(str) + ' (' + df['unidad_medida'] + ')'
-    print(df[['nombre', 'cantidad']])
-    df.plot(kind='bar', x='nombre', y='cantidad')
-    plt.savefig('inventario.png')
+    # Convertir las columnas de fecha a tipo datetime
+    ventas_df['fecha'] = pd.to_datetime(ventas_df['fecha'])
+    compras_df['fecha'] = pd.to_datetime(compras_df['fecha'])
+
+    # Generar DataFrame con las fechas de junio de 2024
+    fechas_junio = pd.date_range(start='2024-06-01', end='2024-06-30', freq='D')
+    stock_df = pd.DataFrame({'fecha': fechas_junio})
+
+    # Calcular el stock acumulado por día
+    ventas_agrupadas = ventas_df.groupby('fecha').sum().reset_index()
+    compras_agrupadas = compras_df.groupby('fecha').sum().reset_index()
+
+    stock_df = stock_df.merge(ventas_agrupadas, on='fecha', how='left').fillna(0)
+    stock_df = stock_df.merge(compras_agrupadas, on='fecha', how='left', suffixes=('_venta', '_compra')).fillna(0)
+    stock_df['stock'] = stock_df['cantidad_compra'] - stock_df['cantidad_venta']
+    stock_df['stock_acumulado'] = stock_df['stock'].cumsum()
+
+    # Graficar el stock por día
+    plt.figure(figsize=(10, 5))
+    plt.plot(stock_df['fecha'], stock_df['stock_acumulado'], marker='o', linestyle='-')
+    plt.title(f'Stock acumulado por día en junio de 2024 (Producto ID: {producto_id})')
+    plt.xlabel('Fecha')
+    plt.ylabel('Stock acumulado')
+    plt.grid(True)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=2))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('var_stock.png')
     plt.close()
-    
-    return jsonify(analisis)
+
+    # Graficar las compras por día
+    plt.figure(figsize=(10, 5))
+    plt.bar(compras_df['fecha'], compras_df['cantidad'], color='blue')
+    plt.title('Compras por día en junio de 2024')
+    plt.xlabel('Fecha')
+    plt.ylabel('Cantidad')
+    plt.grid(True)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=2))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('compras.png')
+    plt.close()
+
+    # Graficar las ventas por día
+    plt.figure(figsize=(10, 5))
+    plt.bar(ventas_df['fecha'], ventas_df['cantidad'], color='red')
+    plt.title(f'Ventas por día en junio de 2024 (Producto ID: {producto_id})')
+    plt.xlabel('Fecha')
+    plt.ylabel('Cantidad')
+    plt.grid(True)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=2))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('ventas.png')
+    plt.close()
+
+    return jsonify({"message": "Gráficos generados correctamente"})
 
 # Rutas para la página web
 @app.route('/carga_venta', methods=['GET', 'POST'])
