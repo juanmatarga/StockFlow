@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, g
 import sqlite3
 import pandas as pd
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 app = Flask(__name__)
@@ -47,15 +48,10 @@ def create_sales_table():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fecha TEXT,
         cliente TEXT,
-        producto_id INTEGER,
-        producto_nombre TEXT,
-        cantidad INTEGER,
-        precio_venta REAL,
         subtotal REAL,
         descuento REAL,
         cargo_envio REAL,
-        total REAL,
-        FOREIGN KEY (producto_id) REFERENCES productos (id)
+        total REAL
     )
     ''')
     db.commit()
@@ -78,10 +74,27 @@ def create_compras_table():
     ''')
     db.commit()
 
+def create_detalle_ventas_table():
+    db = get_db()
+    c = db.cursor()
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS ventas_detalle (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venta_id INTEGER,
+        producto_id INTEGER,
+        precio REAL,
+        cantidad INTEGER,
+        FOREIGN KEY (venta_id) REFERENCES ventas (id),
+        FOREIGN KEY (producto_id) REFERENCES productos (id)
+    )
+    ''')
+    db.commit()
+
 
 with app.app_context():
     create_productos_table() 
     create_sales_table()
+    create_detalle_ventas_table()
     create_compras_table()
 
 # Operaciones CRUD
@@ -127,13 +140,13 @@ def get_producto(id):
     return None
 
 
-def add_venta(cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total):
+def add_venta(fecha, cliente, subtotal, descuento, cargo_envio, total):
     db = get_db()
     c = db.cursor()
     c.execute('''
-    INSERT INTO ventas (cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (cliente, producto_id, producto_nombre, cantidad, precio_venta, subtotal, descuento, cargo_envio, total))
+    INSERT INTO ventas (fecha, cliente, subtotal, descuento, cargo_envio, total)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ''', (fecha, cliente, subtotal, descuento, cargo_envio, total))
     db.commit()
 
 
@@ -154,6 +167,22 @@ def get_compras():
     compras = [dict(row) for row in rows]
     return compras
 
+def add_venta_detalle(venta_id, producto_id, cantidad):
+    db = get_db()
+    c = db.cursor()
+    c.execute('''
+    INSERT INTO ventas_detalle (venta_id, producto_id, cantidad)
+    VALUES (?, ?, ?)
+    ''', (venta_id, producto_id, cantidad))
+    db.commit()
+
+def get_venta_detalles(venta_id):
+    db = get_db()
+    c = db.cursor()
+    c.execute('SELECT * FROM ventas_detalle WHERE venta_id = ?', (venta_id,))
+    rows = c.fetchall()
+    detalles = [dict(row) for row in rows]
+    return detalles
 
 # Rutas para la API
 @app.route('/api/productos', methods=['GET'])
@@ -202,77 +231,160 @@ def add_compra():
         return jsonify({'message': 'Compra cargada exitosamente'}), 201
     return jsonify({'error': 'Producto no encontrado'}), 404
 
-@app.route('/api/analitica', methods=['GET'])
-def analitica():
-    productos = get_productos()
+@app.route('/api/analitica/<int:producto_id>', methods=['GET'])
+def analitica(producto_id):
+    # Conectar a la base de datos
+    db = get_db()
 
-    df = pd.DataFrame(productos, columns=['id', 'nombre', 'cantidad', 'precio', 'unidad_medida'])
+    # Leer datos de ventas y compras desde la base de datos
+    ventas_df = pd.read_sql_query(
+        "SELECT fecha, cantidad FROM ventas WHERE producto_id = ? AND strftime('%Y-%m', fecha) = '2024-06'",
+        db,
+        params=[producto_id]
+    )
 
-    df.to_csv('inventario.csv', index=False)
-    
-    df = pd.read_csv('inventario.csv')
+    compras_df = pd.read_sql_query(
+        "SELECT fecha, cantidad FROM compras WHERE strftime('%Y-%m', fecha) = '2024-06'",
+        db
+    )
 
-    analisis = df.describe().to_json()
-    df['nombre'] = df['nombre'].astype(str) + ' (' + df['unidad_medida'] + ')'
-    print(df[['nombre', 'cantidad']])
-    df.plot(kind='bar', x='nombre', y='cantidad')
-    plt.savefig('inventario.png')
+    # Convertir las columnas de fecha a tipo datetime
+    ventas_df['fecha'] = pd.to_datetime(ventas_df['fecha'])
+    compras_df['fecha'] = pd.to_datetime(compras_df['fecha'])
+
+    # Generar DataFrame con las fechas de junio de 2024
+    fechas_junio = pd.date_range(start='2024-06-01', end='2024-06-30', freq='D')
+    stock_df = pd.DataFrame({'fecha': fechas_junio})
+
+    # Calcular el stock acumulado por día
+    ventas_agrupadas = ventas_df.groupby('fecha').sum().reset_index()
+    compras_agrupadas = compras_df.groupby('fecha').sum().reset_index()
+
+    stock_df = stock_df.merge(ventas_agrupadas, on='fecha', how='left').fillna(0)
+    stock_df = stock_df.merge(compras_agrupadas, on='fecha', how='left', suffixes=('_venta', '_compra')).fillna(0)
+    stock_df['stock'] = stock_df['cantidad_compra'] - stock_df['cantidad_venta']
+    stock_df['stock_acumulado'] = stock_df['stock'].cumsum()
+
+    # Graficar el stock por día
+    plt.figure(figsize=(10, 5))
+    plt.plot(stock_df['fecha'], stock_df['stock_acumulado'], marker='o', linestyle='-')
+    plt.title(f'Stock acumulado por día en junio de 2024 (Producto ID: {producto_id})')
+    plt.xlabel('Fecha')
+    plt.ylabel('Stock acumulado')
+    plt.grid(True)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=2))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('var_stock.png')
     plt.close()
-    
-    return jsonify(analisis)
+
+    # Graficar las compras por día
+    plt.figure(figsize=(10, 5))
+    plt.bar(compras_df['fecha'], compras_df['cantidad'], color='blue')
+    plt.title('Compras por día en junio de 2024')
+    plt.xlabel('Fecha')
+    plt.ylabel('Cantidad')
+    plt.grid(True)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=2))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('compras.png')
+    plt.close()
+
+    # Graficar las ventas por día
+    plt.figure(figsize=(10, 5))
+    plt.bar(ventas_df['fecha'], ventas_df['cantidad'], color='red')
+    plt.title(f'Ventas por día en junio de 2024 (Producto ID: {producto_id})')
+    plt.xlabel('Fecha')
+    plt.ylabel('Cantidad')
+    plt.grid(True)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=2))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('ventas.png')
+    plt.close()
+
+    return jsonify({"message": "Gráficos generados correctamente"})
 
 # Rutas para la página web
-@app.route('/carga_venta', methods=['GET', 'POST'])
+@app.route('/carga_venta', methods=['POST', 'GET'])
 def carga_venta():
-    if request.method == 'POST':
-        cliente = request.form['cliente']
-        producto_id = request.form['producto']
-        cantidad = float(request.form['cantidad'])
-        precio_venta = float(request.form['precio_venta'])
-        descuento = float(request.form['descuento'])
-        cargo_envio = float(request.form['cargo_envio'])
-        fecha = request.form['fecha']
-
-        subtotal = precio_venta * cantidad
-        total = subtotal - descuento + cargo_envio
-
-        db = get_db()
-        c = db.cursor()
-
-        # Parche a acomodar, insertar producto_nombre en la tabla ventas y descontar stock
-        c.execute('SELECT * FROM productos WHERE id = ?', (producto_id,))
-        producto = c.fetchone()
-        producto_nombre = producto['nombre']
-        if producto:
-            nuevo_stock = producto['cantidad'] - cantidad
-            c.execute('UPDATE productos SET cantidad = ? WHERE id = ?', (nuevo_stock, producto_id))
-        
-        # Insertar la nueva venta
-        c.execute('''
-            INSERT INTO ventas (cliente, producto_id, producto_nombre, cantidad, precio_venta, descuento, cargo_envio, total, fecha, subtotal)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (cliente, producto_id, producto_nombre, cantidad, precio_venta, descuento, cargo_envio, total, fecha, subtotal))
-
-        db.commit()
-        return redirect(url_for('carga_venta'))
-
     db = get_db()
     c = db.cursor()
-    c.execute('SELECT id, nombre, cantidad, precio FROM productos')
-    productos = c.fetchall() 
-
-    c.execute('''
-        SELECT v.*, p.nombre as producto_nombre 
-        FROM ventas v 
-        JOIN productos p ON v.producto_id = p.id
-    ''')
+    c.execute('SELECT * FROM productos')
+    productos = c.fetchall()
+    c.execute('SELECT * FROM ventas')
     ventas = c.fetchall()
 
-    return render_template('carga_venta.html', productos=productos, ventas=ventas)
+    if request.method == 'POST':
+        data = request.get_json()
+        print("Datos recibidos:", data)  # Log de datos recibidos
+        items = data['items']
+        fecha = data['fecha']
+        cliente = data['cliente']
+
+        if not items:
+            flash('No se encontraron productos en el carrito.', 'error')
+            return jsonify(success=False, error='No se encontraron productos en el carrito.')
+
+        try:
+            # Calcular totales
+            subtotal = sum(item['cantidad'] * item['precio'] for item in items)
+            descuento = sum(item['descuento'] for item in items)
+            cargo_envio = sum(item['envio'] for item in items)
+            total = subtotal - descuento + cargo_envio
+
+            print(f"Subtotal: {subtotal}, Descuento: {descuento}, Cargo Envío: {cargo_envio}, Total: {total}")
+
+            # Insertar la venta en la tabla 'ventas'
+            c.execute('''
+                INSERT INTO ventas (fecha, cliente, subtotal, descuento, cargo_envio, total)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (fecha, cliente, subtotal, descuento, cargo_envio, total))
+            venta_id = c.lastrowid
+            print("Venta ID:", venta_id)  # Log de venta_id
+
+            # Insertar cada producto en la tabla 'ventas_detalle'
+            for item in items:
+                print("Insertando item:", item)  # Log de cada item
+                c.execute('''
+                    INSERT INTO ventas_detalle (venta_id, producto_id, cantidad, precio)
+                    VALUES (?, ?, ?, ?)
+                ''', (venta_id, item['id'], item['cantidad'], item['precio']))
+
+                # Actualizar el stock del producto
+                c.execute('''
+                    UPDATE productos
+                    SET cantidad = cantidad - ?
+                    WHERE id = ?
+                ''', (item['cantidad'], item['id']))
+
+            db.commit()
+
+            flash('Venta realizada con éxito.', 'success')
+            return jsonify(success=True)
+
+        except Exception as e:
+            db.rollback()
+            print("Error al registrar la venta:", str(e))  # Log del error
+            flash(f'Error al registrar la venta: {str(e)}', 'error')
+            return jsonify(success=False, error=str(e))
+
+        finally:
+            db.close()
+    else:
+        db.close()
+        return render_template('carga_venta.html', productos=productos, ventas=ventas)
 
 
 @app.route('/carga_compras', methods=['GET', 'POST'])
 def carga_compras():
+    db = get_db()
+    c = db.cursor()
+
     if request.method == 'POST':
         producto_id = request.form['producto']
         cantidad = float(request.form['cantidad'])

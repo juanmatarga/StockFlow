@@ -3,62 +3,78 @@
 {% block title %}Ventas{% endblock %}
 
 {% block content %}
-<h1>Carga de Venta</h1>
-<form method="post" action="{{ url_for('carga_venta') }}" onsubmit="return validateForm()" novalidate>
-    <div class="form-group">
-        <label for="fecha">Fecha:</label>
-        <input type="date" class="form-control" id="fecha" name="fecha" required>
+<div class="row">
+    <div class="col-md-8">
+        <form method="post" action="{{ url_for('carga_venta') }}" onsubmit="return validateForm()" novalidate>
+            <div class="form-group">
+                <label for="fecha">Fecha:</label>
+                <input type="date" class="form-control" id="fecha" name="fecha" required>
+            </div>
+            <div class="form-group">
+                <label for="cliente">Nombre del Cliente:</label>
+                <input type="text" class="form-control" id="cliente" name="cliente" required>
+                <div class="invalid-feedback">
+                    Por favor, ingrese el nombre del cliente.
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="producto">Producto:</label>
+                <select class="form-control" id="producto" name="producto" required>
+                    {% for producto in productos %}
+                    <option value="{{ producto['id'] }}" data-stock="{{ producto['cantidad'] }}" data-precio="{{ producto['precio'] }}">
+                        {{ producto['nombre'] }} (Stock: {{ producto['cantidad'] }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="invalid-feedback">
+                    Por favor, seleccione un producto.
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="cantidad">Cantidad:</label>
+                <input type="number" class="form-control" id="cantidad" name="cantidad" min="1" required>
+                <div class="invalid-feedback">
+                    Por favor, ingrese una cantidad válida.
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="precio_venta">Precio de Venta:</label>
+                <input type="number" step="0.01" class="form-control" id="precio_venta" name="precio_venta" min="0" required>
+                <div class="invalid-feedback">
+                    Por favor, ingrese un precio de venta válido.
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="descuento">Descuento:</label>
+                <input type="number" step="0.01" class="form-control" id="descuento" name="descuento" min="0" value="0" required>
+                <div class="invalid-feedback">
+                    Por favor, ingrese un descuento válido.
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="cargo_envio">Cargo por Envío:</label>
+                <input type="number" step="0.01" class="form-control" id="cargo_envio" name="cargo_envio" min="0" value="0" required>
+                <div class="invalid-feedback">
+                    Por favor, ingrese un cargo por envío válido.
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="addToCart()">Cargar producto</button>
+        </form>
     </div>
-    <div class="form-group">
-        <label for="cliente">Nombre del Cliente:</label>
-        <input type="text" class="form-control" id="cliente" name="cliente" required>
-        <div class="invalid-feedback">
-            Por favor, ingrese el nombre del cliente.
+    <div class="col-md-4">
+        <h2>Carrito de Compras</h2>
+        <ul id="cart-items" class="list-group">
+            <!-- Los productos agregados se mostrarán aquí -->
+        </ul>
+        <div class="mt-3">
+            <p>Subtotal: $<span id="subtotal">0.00</span></p>
+            <p>Descuento: $<span id="total-descuento">0.00</span></p>
+            <p>Cargo por Envío: $<span id="total-envio">0.00</span></p>
+            <p>Total: $<span id="total">0.00</span></p>
         </div>
+        <button type="button" class="btn btn-success" onclick="submitOrder()">Finalizar Compra</button>
     </div>
-    <div class="form-group">
-        <label for="producto">Producto:</label>
-        <select class="form-control" id="producto" name="producto" required>
-            {% for producto in productos %}
-            <option value="{{ producto['id'] }}" data-stock="{{ producto['cantidad'] }}" data-precio="{{ producto['precio'] }}">
-                {{ producto['nombre'] }} (Stock: {{ producto['cantidad'] }})
-            </option>
-            {% endfor %}
-        </select>
-        <div class="invalid-feedback">
-            Por favor, seleccione un producto.
-        </div>
-    </div>
-    <div class="form-group">
-        <label for="cantidad">Cantidad:</label>
-        <input type="number" class="form-control" id="cantidad" name="cantidad" min="1" required>
-        <div class="invalid-feedback">
-            Por favor, ingrese una cantidad válida.
-        </div>
-    </div>
-    <div class="form-group">
-        <label for="precio_venta">Precio de Venta:</label>
-        <input type="number" step="0.01" class="form-control" id="precio_venta" name="precio_venta" min="0" required>
-        <div class="invalid-feedback">
-            Por favor, ingrese un precio de venta válido.
-        </div>
-    </div>
-    <div class="form-group">
-        <label for="descuento">Descuento:</label>
-        <input type="number" step="0.01" class="form-control" id="descuento" name="descuento" min="0" value="0" required>
-        <div class="invalid-feedback">
-            Por favor, ingrese un descuento válido.
-        </div>
-    </div>
-    <div class="form-group">
-        <label for="cargo_envio">Cargo por Envío:</label>
-        <input type="number" step="0.01" class="form-control" id="cargo_envio" name="cargo_envio" min="0" value="0" required>
-        <div class="invalid-feedback">
-            Por favor, ingrese un cargo por envío válido.
-        </div>
-    </div>
-    <button type="submit" class="btn btn-primary">Cargar Orden</button>
-</form>
+</div>
 
 <h2 class="mt-5">Últimas Transacciones de Ventas</h2>
 <table class="table table-striped">
@@ -67,9 +83,6 @@
             <th>Nº de Orden</th>
             <th>Fecha</th>
             <th>Cliente</th>
-            <th>Producto</th>
-            <th>Cantidad</th>
-            <th>Precio de Venta</th>
             <th>Subtotal</th>
             <th>Descuento</th>
             <th>Cargo por Envío</th>
@@ -82,9 +95,6 @@
             <td>{{ venta['id'] }}</td>
             <td>{{ venta['fecha'] }}</td>
             <td>{{ venta['cliente'] }}</td>
-            <td>{{ venta['producto_nombre'] }}</td>
-            <td>{{ venta['cantidad'] }}</td>
-            <td>${{ "%.2f"|format(venta['precio_venta']) }}</td>
             <td>${{ "%.2f"|format(venta['subtotal']) }}</td>
             <td>${{ "%.2f"|format(venta['descuento']) }}</td>
             <td>${{ "%.2f"|format(venta['cargo_envio']) }}</td>
@@ -94,64 +104,150 @@
     </tbody>
 </table>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
         var fechaInput = document.getElementById("fecha");
         var today = new Date().toISOString().split('T')[0];
         fechaInput.value = today;
-         });
+    });
 
-        (function() {
-            'use strict';
-            window.addEventListener('load', function() {
-                var forms = document.getElementsByClassName('needs-validation');
-                Array.prototype.filter.call(forms, function(form) {
-                    form.addEventListener('submit', function(event) {
-                        if (form.checkValidity() === false) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }
-                        form.classList.add('was-validated');
-                    }, false);
-                });
-            }, false);
-        })();
+    (function() {
+        'use strict';
+        window.addEventListener('load', function() {
+            var forms = document.getElementsByClassName('needs-validation');
+            Array.prototype.filter.call(forms, function(form) {
+                form.addEventListener('submit', function(event) {
+                    if (form.checkValidity() === false) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        }, false);
+    })();
 
-        function validateForm() {
-            var cantidad = parseFloat(document.getElementById('cantidad').value);
-            var precioVenta = parseFloat(document.getElementById('precio_venta').value);
-            var descuento = parseFloat(document.getElementById('descuento').value);
-            var cargoEnvio = parseFloat(document.getElementById('cargo_envio').value);
-            var producto = document.getElementById('producto');
-            var stock = parseFloat(producto.options[producto.selectedIndex].getAttribute('data-stock'));
-            var subtotal = cantidad * precioVenta;
+    let cartItems = [];
+    let subtotal = 0;
+    let totalDescuento = 0;
+    let totalEnvio = 0;
 
-            if (cantidad > stock) {
-                showCustomError('cantidad', 'La cantidad no puede superar el stock del producto.');
-                return false;
-            }
-            if (precioVenta <= 0) {
-                showCustomError('precio_venta', 'El precio de venta debe ser mayor a cero.');
-                return false;
-            }
-            if (descuento < 0) {
-                showCustomError('descuento', 'El descuento no puede ser negativo.');
-                return false;
-            }
-            if (cargoEnvio < 0) {
-                showCustomError('cargo_envio', 'El cargo por envío no puede ser negativo.');
-                return false;
-            }
-            return true;
+    function addToCart() {
+        const productoSelect = document.getElementById('producto');
+        const productoId = productoSelect.value;
+        const productoNombre = productoSelect.options[productoSelect.selectedIndex].text;
+        const cantidad = parseFloat(document.getElementById('cantidad').value);
+        const precioVenta = parseFloat(document.getElementById('precio_venta').value);
+        const descuento = parseFloat(document.getElementById('descuento').value);
+        const cargoEnvio = parseFloat(document.getElementById('cargo_envio').value);
+
+        const item = {
+            id: productoId,
+            nombre: productoNombre,
+            cantidad: cantidad,
+            precio: precioVenta,
+            descuento: descuento,
+            envio: cargoEnvio,
+            subtotal: cantidad * precioVenta - descuento
+        };
+
+        cartItems.push(item);
+        updateCartDisplay();
+        updateTotals();
+    }
+
+    function updateCartDisplay() {
+        const cartItemsList = document.getElementById('cart-items');
+        cartItemsList.innerHTML = '';
+        cartItems.forEach(item => {
+            const listItem = document.createElement('li');
+            listItem.classList.add('list-group-item');
+            listItem.textContent = `${item.nombre} - Cantidad: ${item.cantidad}, Precio: $${item.precio.toFixed(2)}, Subtotal: $${item.subtotal.toFixed(2)}`;
+            cartItemsList.appendChild(listItem);
+        });
+    }
+
+    function updateTotals() {
+        subtotal = cartItems.reduce((sum, item) => sum + item.cantidad * item.precio - item.descuento, 0);
+        totalDescuento = cartItems.reduce((sum, item) => sum + item.descuento, 0);
+        totalEnvio = cartItems.reduce((sum, item) => sum + item.envio, 0);
+        const total = subtotal + totalEnvio;
+
+        document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+        document.getElementById('total-descuento').textContent = totalDescuento.toFixed(2);
+        document.getElementById('total-envio').textContent = totalEnvio.toFixed(2);
+        document.getElementById('total').textContent = total.toFixed(2);
+    }
+
+    function validateForm() {
+        const cantidad = parseFloat(document.getElementById('cantidad').value);
+        const precioVenta = parseFloat(document.getElementById('precio_venta').value);
+        const descuento = parseFloat(document.getElementById('descuento').value);
+        const cargoEnvio = parseFloat(document.getElementById('cargo_envio').value);
+        const producto = document.getElementById('producto');
+        const stock = parseFloat(producto.options[producto.selectedIndex].getAttribute('data-stock'));
+
+        if (cantidad > stock) {
+            showCustomError('cantidad', 'La cantidad no puede superar el stock del producto.');
+            return false;
         }
-
-        function showCustomError(fieldId, errorMessage) {
-            var field = document.getElementById(fieldId);
-            field.setCustomValidity(errorMessage);
-            field.reportValidity();
-            field.oninput = function() {
-                field.setCustomValidity('');
-            };
+        if (precioVenta <= 0) {
+            showCustomError('precio_venta', 'El precio de venta debe ser mayor a cero.');
+            return false;
         }
-    </script>
+        if (descuento < 0) {
+            showCustomError('descuento', 'El descuento no puede ser negativo.');
+            return false;
+        }
+        if (cargoEnvio < 0) {
+            showCustomError('cargo_envio', 'El cargo por envío no puede ser negativo.');
+            return false;
+        }
+        addToCart();
+        return false;  // Prevent form submission for now
+    }
+
+    function showCustomError(fieldId, errorMessage) {
+        var field = document.getElementById(fieldId);
+        field.setCustomValidity(errorMessage);
+        field.reportValidity();
+        field.oninput = function() {
+            field.setCustomValidity('');
+        };
+    }
+
+    function submitOrder() {
+        const fecha = document.getElementById('fecha').value;
+        const cliente = document.getElementById('cliente').value;
+
+        console.log('Items en el carrito:', cartItems); // Verificar los datos del carrito
+
+        fetch('/carga_venta', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                fecha: fecha,
+                cliente: cliente,
+                items: cartItems
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Orden enviada:', data);
+                alert('Compra finalizada con éxito');
+                cartItems = [];
+                updateCartDisplay();
+                updateTotals();
+            } else {
+                alert(`Error al finalizar la compra: ${data.error}`);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    }
+</script>
 {% endblock %}
